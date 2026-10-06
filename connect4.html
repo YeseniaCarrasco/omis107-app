@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connect 4</title>
+<style>
+  :root {
+    --bg: #e6f4ea;
+    --card: #ffffff;
+    --ink: #1b4d2e;
+    --line: #9fd3ae;
+    --board: #2e7d4f;
+    --hole: #e6f4ea;
+    --red: #d9534f;
+    --yellow: #f2c94c;
+    --size: min(10.5vw, 64px); /* size of one slot */
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 16px;
+  }
+  h1 { margin: 0; font-size: 1.8rem; }
+  .scoreboard { display: flex; gap: 12px; }
+  .score {
+    background: var(--card);
+    border: 2px solid var(--line);
+    border-radius: 10px;
+    padding: 8px 18px;
+    text-align: center;
+    min-width: 90px;
+  }
+  .score .label { font-size: 0.8rem; opacity: 0.7; }
+  .score .num { font-size: 1.5rem; font-weight: 700; }
+  .score.red .num { color: var(--red); }
+  .score.yellow .num { color: #c99a0a; }
+  #status { font-size: 1.2rem; min-height: 1.6em; font-weight: 600; }
+
+  /* 7 columns x 6 rows, fixed-size slots */
+  #board {
+    display: grid;
+    grid-template-columns: repeat(7, var(--size));
+    grid-template-rows: repeat(6, var(--size));
+    gap: 6px;
+    padding: 10px;
+    background: var(--board);
+    border-radius: 14px;
+  }
+  .cell {
+    width: var(--size);
+    height: var(--size);
+    border-radius: 50%;
+    border: none;
+    padding: 0;
+    background: var(--hole);
+    cursor: pointer;
+  }
+  .cell.red { background: var(--red); animation: pop 0.2s ease-out; }
+  .cell.yellow { background: var(--yellow); animation: pop 0.2s ease-out; }
+  .cell.preview-red { background: rgba(217, 83, 79, 0.35); }
+  .cell.preview-yellow { background: rgba(242, 201, 76, 0.45); }
+  .cell.win { box-shadow: 0 0 0 4px #ffffff inset; }
+  .over .cell { cursor: default; }
+  @keyframes pop {
+    from { transform: scale(0.4); }
+    to   { transform: scale(1); }
+  }
+  .buttons { display: flex; gap: 10px; }
+  button.action {
+    font: inherit;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 2px solid var(--ink);
+    background: var(--ink);
+    color: #fff;
+    cursor: pointer;
+  }
+  button.action.secondary { background: transparent; color: var(--ink); }
+</style>
+</head>
+<body>
+  <h1>Connect 4</h1>
+
+  <div class="scoreboard">
+    <div class="score red"><div class="label">Red</div><div class="num" id="scoreR">0</div></div>
+    <div class="score"><div class="label">Draws</div><div class="num" id="scoreD">0</div></div>
+    <div class="score yellow"><div class="label">Yellow</div><div class="num" id="scoreY">0</div></div>
+  </div>
+
+  <div id="status" aria-live="polite"></div>
+  <div id="board" aria-label="Connect 4 board"></div>
+
+  <div class="buttons">
+    <button class="action" id="newGame">New game</button>
+    <button class="action secondary" id="resetScores">Reset scores</button>
+  </div>
+
+<script>
+(function () {
+  const ROWS = 6, COLS = 7;
+  const NAMES = { R: 'Red', Y: 'Yellow' };
+
+  const boardEl = document.getElementById('board');
+  const statusEl = document.getElementById('status');
+  const scoreEls = {
+    R: document.getElementById('scoreR'),
+    Y: document.getElementById('scoreY'),
+    D: document.getElementById('scoreD')
+  };
+
+  let grid, current, gameOver, startingPlayer = 'R';
+  const scores = { R: 0, Y: 0, D: 0 };
+
+  // Build the 42 slots once. Row 0 is the top row.
+  const cells = [];
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const btn = document.createElement('button');
+      btn.className = 'cell';
+      btn.setAttribute('aria-label', 'Column ' + (c + 1));
+      btn.addEventListener('click', () => drop(c));
+      btn.addEventListener('mouseenter', () => showPreview(c));
+      btn.addEventListener('mouseleave', clearPreview);
+      boardEl.appendChild(btn);
+      cells.push(btn);
+    }
+  }
+  const cellAt = (r, c) => cells[r * COLS + c];
+
+  function newGame() {
+    grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+    current = startingPlayer;
+    gameOver = false;
+    boardEl.classList.remove('over');
+    cells.forEach(el => { el.className = 'cell'; });
+    statusEl.textContent = NAMES[current] + "'s turn";
+  }
+
+  function lowestEmptyRow(c) {
+    for (let r = ROWS - 1; r >= 0; r--) {
+      if (!grid[r][c]) return r;
+    }
+    return -1; // column is full
+  }
+
+  function clearPreview() {
+    cells.forEach(el => el.classList.remove('preview-red', 'preview-yellow'));
+  }
+
+  function showPreview(c) {
+    clearPreview();
+    if (gameOver) return;
+    const r = lowestEmptyRow(c);
+    if (r >= 0) {
+      cellAt(r, c).classList.add(current === 'R' ? 'preview-red' : 'preview-yellow');
+    }
+  }
+
+  // Returns the list of connected cells (4 or more) through (r, c), or null.
+  function findWin(r, c) {
+    const player = grid[r][c];
+    const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+    for (const [dr, dc] of directions) {
+      const line = [[r, c]];
+      for (const sign of [1, -1]) {
+        let rr = r + dr * sign, cc = c + dc * sign;
+        while (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS && grid[rr][cc] === player) {
+          line.push([rr, cc]);
+          rr += dr * sign;
+          cc += dc * sign;
+        }
+      }
+      if (line.length >= 4) return line;
+    }
+    return null;
+  }
+
+  function drop(c) {
+    if (gameOver) return;
+    const r = lowestEmptyRow(c);
+    if (r < 0) return; // column full
+
+    clearPreview();
+    grid[r][c] = current;
+    cellAt(r, c).classList.add(current === 'R' ? 'red' : 'yellow');
+
+    const win = findWin(r, c);
+    if (win) {
+      win.forEach(([wr, wc]) => cellAt(wr, wc).classList.add('win'));
+      endGame(NAMES[current] + ' wins!');
+      scores[current]++;
+    } else if (grid[0].every(Boolean)) {
+      endGame("It's a draw!");
+      scores.D++;
+    } else {
+      current = current === 'R' ? 'Y' : 'R';
+      statusEl.textContent = NAMES[current] + "'s turn";
+      showPreview(c);
+    }
+    renderScores();
+  }
+
+  function endGame(message) {
+    gameOver = true;
+    statusEl.textContent = message;
+    boardEl.classList.add('over');
+    // Alternate who goes first each round.
+    startingPlayer = startingPlayer === 'R' ? 'Y' : 'R';
+  }
+
+  function renderScores() {
+    scoreEls.R.textContent = scores.R;
+    scoreEls.Y.textContent = scores.Y;
+    scoreEls.D.textContent = scores.D;
+  }
+
+  document.getElementById('newGame').addEventListener('click', newGame);
+  document.getElementById('resetScores').addEventListener('click', () => {
+    scores.R = scores.Y = scores.D = 0;
+    startingPlayer = 'R';
+    renderScores();
+    newGame();
+  });
+
+  newGame();
+})();
+</script>
+</body>
+</html>
