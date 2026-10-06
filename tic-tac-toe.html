@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tic-Tac-Toe</title>
+<style>
+  :root {
+    --bg: #f5f3ee;
+    --card: #ffffff;
+    --ink: #2b2b2b;
+    --x: #d9534f;
+    --o: #2f7fc1;
+    --win: #ffe9a8;
+    --line: #d8d4c8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 16px;
+  }
+  h1 { margin: 0; font-size: 1.8rem; }
+  .scoreboard { display: flex; gap: 12px; }
+  .score {
+    background: var(--card);
+    border: 2px solid var(--line);
+    border-radius: 10px;
+    padding: 8px 18px;
+    text-align: center;
+    min-width: 90px;
+  }
+  .score .label { font-size: 0.8rem; opacity: 0.7; }
+  .score .num { font-size: 1.5rem; font-weight: 700; }
+  .score.x .num { color: var(--x); }
+  .score.o .num { color: var(--o); }
+  #status { font-size: 1.2rem; min-height: 1.6em; font-weight: 600; }
+  #board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    width: min(90vw, 360px);
+    aspect-ratio: 1;
+  }
+  .cell {
+    background: var(--card);
+    border: 2px solid var(--line);
+    border-radius: 10px;
+    font-size: clamp(2.5rem, 14vw, 4.5rem);
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: var(--ink);
+  }
+  .cell:hover:not(:disabled) { background: #faf8f2; }
+  .cell:disabled { cursor: default; }
+  .cell.x { color: var(--x); }
+  .cell.o { color: var(--o); }
+  .cell.win { background: var(--win); }
+  .buttons { display: flex; gap: 10px; }
+  button.action {
+    font: inherit;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 2px solid var(--ink);
+    background: var(--ink);
+    color: #fff;
+    cursor: pointer;
+  }
+  button.action.secondary { background: transparent; color: var(--ink); }
+</style>
+</head>
+<body>
+  <h1>Tic-Tac-Toe</h1>
+
+  <div class="scoreboard">
+    <div class="score x"><div class="label">Player X</div><div class="num" id="scoreX">0</div></div>
+    <div class="score"><div class="label">Draws</div><div class="num" id="scoreD">0</div></div>
+    <div class="score o"><div class="label">Player O</div><div class="num" id="scoreO">0</div></div>
+  </div>
+
+  <div id="status" aria-live="polite"></div>
+  <div id="board" role="grid" aria-label="Tic-tac-toe board"></div>
+
+  <div class="buttons">
+    <button class="action" id="newGame">New game</button>
+    <button class="action secondary" id="resetScores">Reset scores</button>
+  </div>
+
+<script>
+(function () {
+  const WIN_LINES = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
+    [0, 3, 6], [1, 4, 7], [2, 5, 8], // columns
+    [0, 4, 8], [2, 4, 6]             // diagonals
+  ];
+
+  const boardEl = document.getElementById('board');
+  const statusEl = document.getElementById('status');
+  const scoreEls = {
+    X: document.getElementById('scoreX'),
+    O: document.getElementById('scoreO'),
+    D: document.getElementById('scoreD')
+  };
+
+  let board, current, gameOver, startingPlayer = 'X';
+  const scores = { X: 0, O: 0, D: 0 };
+
+  // Build the 9 cells once.
+  const cells = [];
+  for (let i = 0; i < 9; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'cell';
+    btn.setAttribute('aria-label', 'Cell ' + (i + 1));
+    btn.addEventListener('click', () => play(i));
+    boardEl.appendChild(btn);
+    cells.push(btn);
+  }
+
+  function newGame() {
+    board = Array(9).fill(null);
+    current = startingPlayer;
+    gameOver = false;
+    cells.forEach(c => {
+      c.textContent = '';
+      c.disabled = false;
+      c.className = 'cell';
+    });
+    statusEl.textContent = "Player " + current + "'s turn";
+  }
+
+  function findWinner() {
+    for (const line of WIN_LINES) {
+      const [a, b, c] = line;
+      if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+        return { player: board[a], line };
+      }
+    }
+    return null;
+  }
+
+  function play(i) {
+    if (gameOver || board[i]) return;
+
+    board[i] = current;
+    cells[i].textContent = current;
+    cells[i].classList.add(current.toLowerCase());
+    cells[i].disabled = true;
+
+    const result = findWinner();
+    if (result) {
+      endGame("Player " + result.player + " wins!");
+      scores[result.player]++;
+      result.line.forEach(idx => cells[idx].classList.add('win'));
+    } else if (board.every(Boolean)) {
+      endGame("It's a draw!");
+      scores.D++;
+    } else {
+      current = current === 'X' ? 'O' : 'X';
+      statusEl.textContent = "Player " + current + "'s turn";
+    }
+    renderScores();
+  }
+
+  function endGame(message) {
+    gameOver = true;
+    statusEl.textContent = message;
+    cells.forEach(c => (c.disabled = true));
+    // Alternate who goes first each round.
+    startingPlayer = startingPlayer === 'X' ? 'O' : 'X';
+  }
+
+  function renderScores() {
+    scoreEls.X.textContent = scores.X;
+    scoreEls.O.textContent = scores.O;
+    scoreEls.D.textContent = scores.D;
+  }
+
+  document.getElementById('newGame').addEventListener('click', newGame);
+  document.getElementById('resetScores').addEventListener('click', () => {
+    scores.X = scores.O = scores.D = 0;
+    startingPlayer = 'X';
+    renderScores();
+    newGame();
+  });
+
+  newGame();
+})();
+</script>
+</body>
+</html>
