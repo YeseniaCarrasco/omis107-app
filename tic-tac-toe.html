@@ -136,12 +136,9 @@
 
   const boardEl = document.getElementById('board');
   const statusEl = document.getElementById('status');
-<<<<<<< HEAD
   const resignButton = document.getElementById('resign');
-=======
   const modeEl = document.getElementById('gameMode');
   const difficultyEl = document.getElementById('difficulty');
->>>>>>> tic-tac-toe3
   const scoreEls = {
     X: document.getElementById('scoreX'),
     O: document.getElementById('scoreO'),
@@ -318,15 +315,12 @@
   }
 
   document.getElementById('newGame').addEventListener('click', newGame);
-<<<<<<< HEAD
   resignButton.addEventListener('click', resign);
-=======
   modeEl.addEventListener('change', () => {
     difficultyEl.disabled = modeEl.value !== 'computer';
     newGame();
   });
   difficultyEl.addEventListener('change', newGame);
->>>>>>> tic-tac-toe3
   document.getElementById('resetScores').addEventListener('click', () => {
     scores.X = scores.O = scores.D = 0;
     startingPlayer = 'X';
