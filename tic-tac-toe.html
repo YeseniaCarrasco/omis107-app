@@ -69,6 +69,16 @@
   .cell.o { color: var(--o); }
   .cell.win { background: var(--win); }
   .buttons { display: flex; gap: 10px; }
+  .settings { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .setting { display: flex; align-items: center; gap: 6px; }
+  .setting select {
+    font: inherit;
+    padding: 6px 8px;
+    border: 2px solid var(--line);
+    border-radius: 6px;
+    color: var(--ink);
+    background: var(--card);
+  }
   button.action {
     font: inherit;
     padding: 8px 16px;
@@ -94,6 +104,22 @@
   <div id="status" aria-live="polite"></div>
   <div id="board" role="grid" aria-label="Tic-tac-toe board"></div>
 
+  <div class="settings">
+    <label class="setting" for="gameMode">Play
+      <select id="gameMode">
+        <option value="two">2 players</option>
+        <option value="computer">vs computer</option>
+      </select>
+    </label>
+    <label class="setting" for="difficulty">Difficulty
+      <select id="difficulty" disabled>
+        <option value="easy">Easy</option>
+        <option value="medium">Medium</option>
+        <option value="hard">Hard</option>
+      </select>
+    </label>
+  </div>
+
   <div class="buttons">
     <button class="action" id="newGame">New game</button>
     <button class="action secondary" id="resign">Resign</button>
@@ -110,14 +136,20 @@
 
   const boardEl = document.getElementById('board');
   const statusEl = document.getElementById('status');
+<<<<<<< HEAD
   const resignButton = document.getElementById('resign');
+=======
+  const modeEl = document.getElementById('gameMode');
+  const difficultyEl = document.getElementById('difficulty');
+>>>>>>> tic-tac-toe3
   const scoreEls = {
     X: document.getElementById('scoreX'),
     O: document.getElementById('scoreO'),
     D: document.getElementById('scoreD')
   };
 
-  let board, current, gameOver, startingPlayer = 'X';
+  let board, current, gameOver, startingPlayer = 'X', computerTimer;
+  let turnId = 0;
   const scores = { X: 0, O: 0, D: 0 };
 
   // Build the 9 cells once.
@@ -132,8 +164,10 @@
   }
 
   function newGame() {
+    clearTimeout(computerTimer);
+    turnId++;
     board = Array(9).fill(null);
-    current = startingPlayer;
+    current = modeEl.value === 'computer' ? 'X' : startingPlayer;
     gameOver = false;
     resignButton.disabled = false;
     cells.forEach(c => {
@@ -141,7 +175,7 @@
       c.disabled = false;
       c.className = 'cell';
     });
-    statusEl.textContent = "Player " + current + "'s turn";
+    updateTurn();
   }
 
   function findWinner() {
@@ -154,14 +188,7 @@
     return null;
   }
 
-  function play(i) {
-    if (gameOver || board[i]) return;
-
-    board[i] = current;
-    cells[i].textContent = current;
-    cells[i].classList.add(current.toLowerCase());
-    cells[i].disabled = true;
-
+  function finishTurn() {
     const result = findWinner();
     if (result) {
       endGame("Player " + result.player + " wins!");
@@ -172,9 +199,99 @@
       scores.D++;
     } else {
       current = current === 'X' ? 'O' : 'X';
-      statusEl.textContent = "Player " + current + "'s turn";
+      updateTurn();
+      if (modeEl.value === 'computer' && current === 'O') computerMove();
     }
     renderScores();
+  }
+
+  function play(i) {
+    if (gameOver || board[i] || (modeEl.value === 'computer' && current === 'O')) return;
+    placeMove(i, current);
+  }
+
+  function placeMove(i, player) {
+    board[i] = player;
+    cells[i].textContent = player;
+    cells[i].classList.add(player.toLowerCase());
+    cells[i].disabled = true;
+    finishTurn();
+  }
+
+  function updateTurn() {
+    statusEl.textContent = modeEl.value === 'computer' && current === 'O'
+      ? 'Computer is thinking...'
+      : "Player " + current + "'s turn";
+  }
+
+  function computerMove() {
+    const currentTurn = turnId;
+    computerTimer = setTimeout(() => {
+      if (gameOver || currentTurn !== turnId) return;
+      const move = chooseComputerMove();
+      placeMove(move, 'O');
+    }, 300);
+  }
+
+  function chooseComputerMove() {
+    const available = board.map((value, index) => value ? -1 : index).filter(index => index >= 0);
+    const difficulty = difficultyEl.value;
+    if (difficulty === 'easy') return randomMove(available);
+    if (difficulty === 'medium') {
+      return findImmediateMove('O') ?? findImmediateMove('X') ?? randomMove(available);
+    }
+    return bestMove();
+  }
+
+  function randomMove(moves) {
+    return moves[Math.floor(Math.random() * moves.length)];
+  }
+
+  function findImmediateMove(player) {
+    for (let i = 0; i < board.length; i++) {
+      if (!board[i]) {
+        board[i] = player;
+        const wins = Boolean(findWinner());
+        board[i] = null;
+        if (wins) return i;
+      }
+    }
+    return null;
+  }
+
+  function bestMove() {
+    let bestScore = -Infinity;
+    let move = -1;
+    for (let i = 0; i < board.length; i++) {
+      if (!board[i]) {
+        board[i] = 'O';
+        const score = minimax(false, 0);
+        board[i] = null;
+        if (score > bestScore) {
+          bestScore = score;
+          move = i;
+        }
+      }
+    }
+    return move;
+  }
+
+  function minimax(isComputerTurn, depth) {
+    const result = findWinner();
+    if (result) return result.player === 'O' ? 10 - depth : depth - 10;
+    if (board.every(Boolean)) return 0;
+
+    let bestScore = isComputerTurn ? -Infinity : Infinity;
+    const player = isComputerTurn ? 'O' : 'X';
+    for (let i = 0; i < board.length; i++) {
+      if (!board[i]) {
+        board[i] = player;
+        const score = minimax(!isComputerTurn, depth + 1);
+        board[i] = null;
+        bestScore = isComputerTurn ? Math.max(bestScore, score) : Math.min(bestScore, score);
+      }
+    }
+    return bestScore;
   }
 
   function endGame(message) {
@@ -201,7 +318,15 @@
   }
 
   document.getElementById('newGame').addEventListener('click', newGame);
+<<<<<<< HEAD
   resignButton.addEventListener('click', resign);
+=======
+  modeEl.addEventListener('change', () => {
+    difficultyEl.disabled = modeEl.value !== 'computer';
+    newGame();
+  });
+  difficultyEl.addEventListener('change', newGame);
+>>>>>>> tic-tac-toe3
   document.getElementById('resetScores').addEventListener('click', () => {
     scores.X = scores.O = scores.D = 0;
     startingPlayer = 'X';
