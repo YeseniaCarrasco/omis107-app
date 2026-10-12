@@ -79,6 +79,7 @@
     cursor: pointer;
   }
   button.action.secondary { background: transparent; color: var(--ink); }
+  button.action:disabled { opacity: 0.5; cursor: default; }
 </style>
 </head>
 <body>
@@ -95,6 +96,7 @@
 
   <div class="buttons">
     <button class="action" id="newGame">New game</button>
+    <button class="action secondary" id="resign">Resign</button>
     <button class="action secondary" id="resetScores">Reset scores</button>
   </div>
 
@@ -108,6 +110,7 @@
 
   const boardEl = document.getElementById('board');
   const statusEl = document.getElementById('status');
+  const resignButton = document.getElementById('resign');
   const scoreEls = {
     X: document.getElementById('scoreX'),
     O: document.getElementById('scoreO'),
@@ -132,6 +135,7 @@
     board = Array(9).fill(null);
     current = startingPlayer;
     gameOver = false;
+    resignButton.disabled = false;
     cells.forEach(c => {
       c.textContent = '';
       c.disabled = false;
@@ -176,9 +180,18 @@
   function endGame(message) {
     gameOver = true;
     statusEl.textContent = message;
+    resignButton.disabled = true;
     cells.forEach(c => (c.disabled = true));
     // Alternate who goes first each round.
     startingPlayer = startingPlayer === 'X' ? 'O' : 'X';
+  }
+
+  function resign() {
+    if (gameOver) return;
+    const winner = current === 'X' ? 'O' : 'X';
+    scores[winner]++;
+    endGame('Player ' + current + ' resigned. Player ' + winner + ' wins!');
+    renderScores();
   }
 
   function renderScores() {
@@ -188,6 +201,7 @@
   }
 
   document.getElementById('newGame').addEventListener('click', newGame);
+  resignButton.addEventListener('click', resign);
   document.getElementById('resetScores').addEventListener('click', () => {
     scores.X = scores.O = scores.D = 0;
     startingPlayer = 'X';
